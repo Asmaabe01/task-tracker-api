@@ -57,8 +57,16 @@ def home():
 
 
 @app.get("/tasks", response_model=list[Task])
-def get_tasks(session: Session = Depends(get_session)):
-    tasks = session.exec(select(Task)).all()
+def get_tasks(
+    completed: bool | None = None,
+    session: Session = Depends(get_session)
+):
+    statement = select(Task)
+
+    if completed is not None:
+        statement = statement.where(Task.completed == completed)
+
+    tasks = session.exec(statement).all()
     return tasks
 
 
