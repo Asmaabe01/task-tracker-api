@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from sqlmodel import Field, Session, SQLModel, create_engine, select
+from typing import Literal
 
 
 # ---------------- Models ----------------
@@ -62,6 +63,7 @@ def get_tasks(
     search: str | None = None,
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=10, ge=1, le=100),
+    sort: Literal["asc", "desc"] = "asc",
     session: Session = Depends(get_session)
 ):
     statement = select(Task)
@@ -71,6 +73,12 @@ def get_tasks(
 
     if search:
         statement = statement.where(Task.title.contains(search))
+
+    if sort=="desc":
+        statement = statement.order_by(Task.id.desc())
+    else:
+        statement = statement.order_by(Task.id.asc())
+
 
     statement = statement.offset(offset).limit(limit)
 
