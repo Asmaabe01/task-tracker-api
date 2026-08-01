@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from sqlmodel import Field, Session, SQLModel, create_engine, select
+from typing import Literal
 
 
 # ---------------- Models ----------------
@@ -17,6 +18,11 @@ class Task(TaskBase, table=True):
 
 class TaskCreate(TaskBase):
     pass
+
+
+class TaskUpdate(SQLModel):
+    title: str | None = None
+    completed: bool | None = None
 
 
 # ---------------- Database ----------------
@@ -62,6 +68,7 @@ def get_tasks(
     search: str | None = None,
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=10, ge=1, le=100),
+    sort: Literal["asc", "desc"] = "asc",
     session: Session = Depends(get_session)
 ):
     statement = select(Task)
@@ -71,6 +78,12 @@ def get_tasks(
 
     if search:
         statement = statement.where(Task.title.contains(search))
+
+    if sort == "desc":
+        statement = statement.order_by(Task.id.desc())
+    else:
+        statement = statement.order_by(Task.id.asc())
+
 
     statement = statement.offset(offset).limit(limit)
 
@@ -130,6 +143,33 @@ def update_task(
 
     db_task.title = updated_task.title
     db_task.completed = updated_task.completed
+
+    session.add(db_task)
+    session.commit()
+    session.refresh(db_task)
+
+    return db_task
+
+@app.patch("/tasks/{task_id}", response_model=Task)
+def patch_task(
+    task_id: int,
+    task_update: TaskUpdate,
+    session: Session = Depends(get_session)
+):
+    db_task = session.get(Task, task_id)
+
+    if db_task is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Task not found"
+        )
+
+    update_data = task_update.model_dump(
+    exclude_unset=True,
+    exclude_none=True
+)
+
+    db_task.sqlmodel_update(update_data)
 
     session.add(db_task)
     session.commit()
