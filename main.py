@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Query, status
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 
 
@@ -59,6 +59,9 @@ def home():
 @app.get("/tasks", response_model=list[Task])
 def get_tasks(
     completed: bool | None = None,
+    search: str | None = None,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=10, ge=1, le=100),
     session: Session = Depends(get_session)
 ):
     statement = select(Task)
@@ -66,8 +69,15 @@ def get_tasks(
     if completed is not None:
         statement = statement.where(Task.completed == completed)
 
+    if search:
+        statement = statement.where(Task.title.contains(search))
+
+    statement = statement.offset(offset).limit(limit)
+
     tasks = session.exec(statement).all()
     return tasks
+
+
 
 
 @app.get("/tasks/{task_id}", response_model=Task)
