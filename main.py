@@ -20,6 +20,11 @@ class TaskCreate(TaskBase):
     pass
 
 
+class TaskUpdate(SQLModel):
+    title: str | None = None
+    completed: bool | None = None
+
+
 # ---------------- Database ----------------
 
 sqlite_file_name = "tasks.db"
@@ -74,7 +79,7 @@ def get_tasks(
     if search:
         statement = statement.where(Task.title.contains(search))
 
-    if sort=="desc":
+    if sort == "desc":
         statement = statement.order_by(Task.id.desc())
     else:
         statement = statement.order_by(Task.id.asc())
@@ -138,6 +143,33 @@ def update_task(
 
     db_task.title = updated_task.title
     db_task.completed = updated_task.completed
+
+    session.add(db_task)
+    session.commit()
+    session.refresh(db_task)
+
+    return db_task
+
+@app.patch("/tasks/{task_id}", response_model=Task)
+def patch_task(
+    task_id: int,
+    task_update: TaskUpdate,
+    session: Session = Depends(get_session)
+):
+    db_task = session.get(Task, task_id)
+
+    if db_task is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Task not found"
+        )
+
+    update_data = task_update.model_dump(
+    exclude_unset=True,
+    exclude_none=True
+)
+
+    db_task.sqlmodel_update(update_data)
 
     session.add(db_task)
     session.commit()
