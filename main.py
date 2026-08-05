@@ -91,7 +91,28 @@ def register_user(
     user: UserCreate,
     session: Session = Depends(get_session)
 ):
-    pass
+    
+    statement = select(User).where(User.username == user.username)
+    existing_user = session.exec(statement).first()
+
+    if existing_user:
+        raise HTTPException(
+            status_code=400,
+            detail="Username already registered"
+    )
+
+        hashed = hash_password(user.password)
+
+    db_user = User(
+        username=user.username,
+        hashed_password=hashed
+    )
+
+    session.add(db_user)
+    session.commit()
+    session.refresh(db_user)
+
+    return db_user
 
 
 @app.get("/tasks", response_model=list[Task])
