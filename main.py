@@ -30,6 +30,10 @@ class UserCreate(SQLModel):
     username: str
     password: str
 
+class UserLogin(SQLModel):
+    username: str
+    password: str
+
 
 class User(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
@@ -56,6 +60,15 @@ password_hash = PasswordHash.recommended()
 
 def hash_password(password: str) -> str:
     return password_hash.hash(password)
+
+def verify_password(
+    plain_password: str,
+    hashed_password: str
+) -> bool:
+    return password_hash.verify(
+        plain_password,
+        hashed_password
+    )
 
 
 def create_db_and_tables():
