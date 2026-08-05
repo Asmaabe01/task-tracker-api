@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from pwdlib import PasswordHash
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from sqlmodel import Field, Session, SQLModel, create_engine, select
@@ -25,6 +26,21 @@ class TaskUpdate(SQLModel):
     completed: bool | None = None
 
 
+class UserCreate(SQLModel):
+    username: str
+    password: str
+
+
+class User(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    username: str = Field(index=True)
+    hashed_password: str
+
+class UserPublic(SQLModel):
+    id: int
+    username: str
+
+
 # ---------------- Database ----------------
 
 sqlite_file_name = "tasks.db"
@@ -35,6 +51,11 @@ engine = create_engine(
     echo=True,
     connect_args={"check_same_thread": False}
 )
+
+password_hash = PasswordHash.recommended()
+
+def hash_password(password: str) -> str:
+    return password_hash.hash(password)
 
 
 def create_db_and_tables():
@@ -60,6 +81,17 @@ app = FastAPI(lifespan=lifespan)
 @app.get("/")
 def home():
     return {"message": "Welcome to my Task Tracker API"}
+
+@app.post(
+    "/register",
+    response_model=UserPublic,
+    status_code=status.HTTP_201_CREATED
+)
+def register_user(
+    user: UserCreate,
+    session: Session = Depends(get_session)
+):
+    pass
 
 
 @app.get("/tasks", response_model=list[Task])
