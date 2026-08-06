@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from typing import Literal
 from datetime import datetime, timedelta, timezone
 import jwt
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from pwdlib import PasswordHash
@@ -29,11 +30,6 @@ class TaskUpdate(SQLModel):
 
 
 class UserCreate(SQLModel):
-    username: str
-    password: str
-
-
-class UserLogin(SQLModel):
     username: str
     password: str
 
@@ -114,6 +110,47 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    session: Session = Depends(get_session)
+):
+    try:
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+
+        username = payload.get("sub")
+
+        if username is None:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid token"
+            )
+
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired token"
+        )
+
+    statement = select(User).where(
+        User.username == username
+    )
+
+    db_user = session.exec(statement).first()
+
+    if db_user is None:
+        raise HTTPException(
+            status_code=401,
+            detail="User not found"
+        )
+
+    return db_user
+
 
 # ---------------- Endpoints ----------------
 
@@ -165,11 +202,11 @@ def register_user(
 
 @app.post("/login")
 def login_user(
-    user: UserLogin,
+    form_data: OAuth2PasswordRequestForm = Depends(),
     session: Session = Depends(get_session)
 ):
     statement = select(User).where(
-        User.username == user.username
+        User.username == form_data.username
     )
 
     db_user = session.exec(statement).first()
@@ -181,7 +218,7 @@ def login_user(
         )
 
     if not verify_password(
-        user.password,
+        form_data.password,
         db_user.hashed_password
     ):
         raise HTTPException(
@@ -194,9 +231,7 @@ def login_user(
     return {
         "access_token": access_token,
         "token_type": "bearer"
-        
     }
-
 
 # ---------------- Tasks ----------------
 
@@ -207,6 +242,7 @@ def get_tasks(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=10, ge=1, le=100),
     sort: Literal["asc", "desc"] = "asc",
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     statement = select(Task)
@@ -256,6 +292,7 @@ def get_task(
 )
 def create_task(
     task: TaskCreate,
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     db_task = Task.model_validate(task)
