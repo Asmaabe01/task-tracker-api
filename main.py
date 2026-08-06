@@ -1,9 +1,11 @@
 from contextlib import asynccontextmanager
-from pwdlib import PasswordHash
+from typing import Literal
+from datetime import datetime, timedelta, timezone
+import jwt
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
+from pwdlib import PasswordHash
 from sqlmodel import Field, Session, SQLModel, create_engine, select
-from typing import Literal
 
 
 # ---------------- Models ----------------
@@ -30,6 +32,7 @@ class UserCreate(SQLModel):
     username: str
     password: str
 
+
 class UserLogin(SQLModel):
     username: str
     password: str
@@ -39,6 +42,7 @@ class User(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     username: str = Field(index=True)
     hashed_password: str
+
 
 class UserPublic(SQLModel):
     id: int
@@ -58,8 +62,14 @@ engine = create_engine(
 
 password_hash = PasswordHash.recommended()
 
+SECRET_KEY = "temporary-learning-secret-key"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+
 def hash_password(password: str) -> str:
     return password_hash.hash(password)
+
 
 def verify_password(
     plain_password: str,
@@ -68,6 +78,22 @@ def verify_password(
     return password_hash.verify(
         plain_password,
         hashed_password
+    )
+
+def create_access_token(username: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(
+        minutes=ACCESS_TOKEN_EXPIRE_MINUTES
+    )
+
+    token_data = {
+        "sub": username,
+        "exp": expire
+    }
+
+    return jwt.encode(
+        token_data,
+        SECRET_KEY,
+        algorithm=ALGORITHM
     )
 
 
@@ -93,7 +119,12 @@ app = FastAPI(lifespan=lifespan)
 
 @app.get("/")
 def home():
-    return {"message": "Welcome to my Task Tracker API"}
+    return {
+        "message": "Welcome to my Task Tracker API"
+    }
+
+
+# ---------------- Register ----------------
 
 @app.post(
     "/register",
@@ -104,17 +135,19 @@ def register_user(
     user: UserCreate,
     session: Session = Depends(get_session)
 ):
-    
-    statement = select(User).where(User.username == user.username)
+    statement = select(User).where(
+        User.username == user.username
+    )
+
     existing_user = session.exec(statement).first()
 
     if existing_user:
         raise HTTPException(
             status_code=400,
             detail="Username already registered"
-    )
+        )
 
-        hashed = hash_password(user.password)
+    hashed = hash_password(user.password)
 
     db_user = User(
         username=user.username,
@@ -128,6 +161,45 @@ def register_user(
     return db_user
 
 
+# ---------------- Login ----------------
+
+@app.post("/login")
+def login_user(
+    user: UserLogin,
+    session: Session = Depends(get_session)
+):
+    statement = select(User).where(
+        User.username == user.username
+    )
+
+    db_user = session.exec(statement).first()
+
+    if db_user is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid username or password"
+        )
+
+    if not verify_password(
+        user.password,
+        db_user.hashed_password
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid username or password"
+        )
+
+    access_token = create_access_token(db_user.username)
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer"
+        
+    }
+
+
+# ---------------- Tasks ----------------
+
 @app.get("/tasks", response_model=list[Task])
 def get_tasks(
     completed: bool | None = None,
@@ -140,23 +212,25 @@ def get_tasks(
     statement = select(Task)
 
     if completed is not None:
-        statement = statement.where(Task.completed == completed)
+        statement = statement.where(
+            Task.completed == completed
+        )
 
     if search:
-        statement = statement.where(Task.title.contains(search))
+        statement = statement.where(
+            Task.title.contains(search)
+        )
 
     if sort == "desc":
         statement = statement.order_by(Task.id.desc())
     else:
         statement = statement.order_by(Task.id.asc())
 
-
     statement = statement.offset(offset).limit(limit)
 
     tasks = session.exec(statement).all()
+
     return tasks
-
-
 
 
 @app.get("/tasks/{task_id}", response_model=Task)
@@ -216,6 +290,7 @@ def update_task(
 
     return db_task
 
+
 @app.patch("/tasks/{task_id}", response_model=Task)
 def patch_task(
     task_id: int,
@@ -231,9 +306,9 @@ def patch_task(
         )
 
     update_data = task_update.model_dump(
-    exclude_unset=True,
-    exclude_none=True
-)
+        exclude_unset=True,
+        exclude_none=True
+    )
 
     db_task.sqlmodel_update(update_data)
 
