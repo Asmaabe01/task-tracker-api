@@ -9,7 +9,10 @@ from pwdlib import PasswordHash
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 
 
-# ---------------- Models ----------------
+# ---------------- 1. Database Models ----------------
+# Here we define the tables that will exist in our database.
+# Task = task table
+# User = user table
 
 class TaskBase(SQLModel):
     title: str
@@ -18,6 +21,7 @@ class TaskBase(SQLModel):
 
 class Task(TaskBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
+    user_id: int | None = None
 
 
 class TaskCreate(TaskBase):
@@ -45,7 +49,9 @@ class UserPublic(SQLModel):
     username: str
 
 
-# ---------------- Database ----------------
+# ---------------- 2. Database Connection ----------------
+# Here we create the connection between FastAPI and SQLite database.
+# tasks.db is where our data is stored.
 
 sqlite_file_name = "tasks.db"
 sqlite_url = f"sqlite:///{sqlite_file_name}"
@@ -55,6 +61,12 @@ engine = create_engine(
     echo=True,
     connect_args={"check_same_thread": False}
 )
+
+# ---------------- 3. Authentication System ----------------
+# This section handles:
+# - password encryption
+# - creating JWT tokens
+# - checking if a user is logged in
 
 password_hash = PasswordHash.recommended()
 
@@ -161,7 +173,10 @@ def home():
     }
 
 
-# ---------------- Register ----------------
+# ---------------- User Authentication Endpoints ----------------
+# Register creates a new user.
+# Login checks username/password.
+# Successful login gives a JWT token.
 
 @app.post(
     "/register",
@@ -198,8 +213,6 @@ def register_user(
     return db_user
 
 
-# ---------------- Login ----------------
-
 @app.post("/login")
 def login_user(
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -233,7 +246,13 @@ def login_user(
         "token_type": "bearer"
     }
 
-# ---------------- Tasks ----------------
+
+# ---------------- Task CRUD Endpoints ----------------
+# CRUD means:
+# Create  -> POST /tasks
+# Read    -> GET /tasks
+# Update  -> PUT/PATCH /tasks/{id}
+# Delete  -> DELETE /tasks/{id}
 
 @app.get("/tasks", response_model=list[Task])
 def get_tasks(
@@ -295,11 +314,24 @@ def create_task(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
-    db_task = Task.model_validate(task)
+
+    print("TASK RECEIVED:", task)
+    print("CURRENT USER:", current_user)
+
+
+    db_task = Task(
+    title=task.title,
+    completed=task.completed,
+    user_id=current_user.id
+)
+
+    print("DATABASE TASK:", db_task)
 
     session.add(db_task)
     session.commit()
     session.refresh(db_task)
+
+    print(db_task)
 
     return db_task
 
