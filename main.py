@@ -315,6 +315,7 @@ def create_task(
     session: Session = Depends(get_session)
 ):
 
+    print("FUNCTION STARTED")
     print("TASK RECEIVED:", task)
     print("CURRENT USER:", current_user)
 
