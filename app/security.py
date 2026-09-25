@@ -14,9 +14,11 @@ from app.models.user import User
 password_hash = PasswordHash.recommended()
 
 
-SECRET_KEY = "temporary-learning-secret-key"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+from app.config import (
+    SECRET_KEY,
+    ALGORITHM,
+    ACCESS_TOKEN_EXPIRE_MINUTES
+)
 
 
 oauth2_scheme = OAuth2PasswordBearer(
