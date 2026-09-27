@@ -10,15 +10,14 @@ from sqlmodel import Session, select
 from app.database import get_session
 from app.models.user import User
 
-
-password_hash = PasswordHash.recommended()
-
-
 from app.config import (
     SECRET_KEY,
     ALGORITHM,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
+
+
+password_hash = PasswordHash.recommended()
 
 
 oauth2_scheme = OAuth2PasswordBearer(
@@ -72,6 +71,21 @@ def get_current_user(
         )
 
         username = payload.get("sub")
+
+        if username is None:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid token"
+            )
+
+
+    except jwt.ExpiredSignatureError:
+
+        raise HTTPException(
+            status_code=401,
+            detail="Token expired"
+        )
+
 
     except jwt.InvalidTokenError:
 

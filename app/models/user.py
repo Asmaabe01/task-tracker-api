@@ -8,7 +8,10 @@ class User(SQLModel, table=True):
         primary_key=True
     )
 
-    username: str = Field(index=True)
+    username: str = Field(
+    index=True,
+    unique=True
+)
 
     hashed_password: str
 
