@@ -13,12 +13,11 @@ class Task(TaskBase, table=True):
         primary_key=True
     )
 
-    user_id: int | None = Field(
-        default=None,
+    user_id: int = Field(
         foreign_key="user.id"
     )
 
-    user: "User" = Relationship(
+    user: "User | None" = Relationship(
         back_populates="tasks"
     )
 
