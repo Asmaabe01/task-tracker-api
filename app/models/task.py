@@ -4,6 +4,7 @@ from sqlmodel import SQLModel, Field, Relationship
 class TaskBase(SQLModel):
     title: str
     completed: bool = False
+    priority: str = "medium"
 
 
 class Task(TaskBase, table=True):

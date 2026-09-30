@@ -22,10 +22,11 @@ def create_task(
 ):
 
     new_task = Task(
-        title=task.title,
-        completed=task.completed,
-        user_id=current_user.id
-    )
+    title=task.title,
+    completed=task.completed,
+    priority=task.priority,
+    user_id=current_user.id
+)
 
     session.add(new_task)
     session.commit()
