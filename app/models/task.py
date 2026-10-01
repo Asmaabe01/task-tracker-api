@@ -1,10 +1,18 @@
+from enum import Enum
+
 from sqlmodel import SQLModel, Field, Relationship
 
 
+
+class Priority(str, Enum):
+    low = "low"
+    medium = "medium"
+    high = "high"
+    
 class TaskBase(SQLModel):
     title: str
     completed: bool = False
-    priority: str = "medium"
+    priority: Priority = Priority.medium
 
 
 class Task(TaskBase, table=True):
@@ -18,7 +26,7 @@ class Task(TaskBase, table=True):
         foreign_key="user.id"
     )
 
-    user: "User | None" = Relationship(
+    user: "User" = Relationship(
         back_populates="tasks"
     )
 
@@ -30,3 +38,6 @@ class TaskCreate(TaskBase):
 class TaskUpdate(SQLModel):
     title: str | None = None
     completed: bool | None = None
+    priority: Priority | None = None
+
+
