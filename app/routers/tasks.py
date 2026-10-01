@@ -38,15 +38,33 @@ def create_task(
 
 @router.get("/")
 def get_tasks(
+    completed: bool | None = None,
+    priority: str | None = None,
+    page: int = 1,
+    limit: int = 10,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
 
-    tasks = session.exec(
-        select(Task).where(
-            Task.user_id == current_user.id
+    statement = select(Task).where(
+        Task.user_id == current_user.id
+    )
+
+    if completed is not None:
+        statement = statement.where(
+            Task.completed == completed
         )
-    ).all()
+
+    if priority is not None:
+        statement = statement.where(
+            Task.priority == priority
+        )
+
+    offset = (page - 1) * limit
+
+    statement = statement.offset(offset).limit(limit)
+
+    tasks = session.exec(statement).all()
 
     return tasks
 
