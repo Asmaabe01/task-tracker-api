@@ -1,17 +1,11 @@
 from sqlmodel import Session, create_engine
 
-
-sqlite_file_name = "tasks.db"
-
-sqlite_url = f"sqlite:///{sqlite_file_name}"
+from app.config import DATABASE_URL
 
 
 engine = create_engine(
-    sqlite_url,
-    echo=True,
-    connect_args={
-        "check_same_thread": False
-    }
+    DATABASE_URL,
+    echo=True
 )
 
 
